@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { straicoChat } from '@/lib/straico';
 import { getTerenceSystemPrompt } from '@/lib/terence-system-prompt';
+import { getHistory, appendMessages } from '@/lib/session';
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, userMessage } = await request.json();
-    const trimmedHistory = Array.isArray(messages) ? messages.slice(-8) : [];
-    const content = await straicoChat(trimmedHistory, userMessage, getTerenceSystemPrompt());
+    const { sessionId, userMessage } = await request.json();
+
+    const history = sessionId ? await getHistory(sessionId, 8) : [];
+    const content = await straicoChat(history, userMessage, getTerenceSystemPrompt());
+
+    if (sessionId) {
+      await appendMessages(sessionId, [
+        { role: 'user', content: userMessage },
+        { role: 'assistant', content: content },
+      ]);
+    }
+
     return NextResponse.json({ role: 'assistant', content });
   } catch (error) {
     console.error('Chat API error:', error instanceof Error ? error.message : error);
